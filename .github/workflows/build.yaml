@@ -67,58 +67,37 @@ jobs:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
       
-      # - name: Change NSS-Packages branch
-      #   run: |
-      #     sed -i 's|src-git nss_packages https://github.com/qosmio/nss-packages.git;NSS-12.5-K6.x|src-git nss_packages https://github.com/qosmio/nss-packages.git;NSS-12.5-K6.x-NAPI|' feeds.conf.default
-      #     cat feeds.conf.default
-      
       - name: Checkout current repository
         uses: actions/checkout@v4
         with:
           path: "custom_repo"
+      
+      - name: Add extra packages
+        run: |
+          git clone --depth=1 https://github.com/gSpotx2f/luci-app-temp-status package/luci-app-temp-status
+          git clone --depth=1 https://github.com/gSpotx2f/luci-app-cpu-status-mini package/luci-app-cpu-status-mini
+          git clone --depth=1 https://github.com/sbwml/luci-app-airconnect package/luci-app-airconnect
       
       - name: Update and install feeds
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
       
-      # - name: Apply NSS Status patch
-      #   run: |
-      #     mv custom_repo/patches/${{ env.NSS_STATUS_PATCH }} feeds/luci/${{ env.NSS_STATUS_PATCH }}
-      #     cd feeds/luci
-      #     git apply ${{ env.NSS_STATUS_PATCH }}
-      
       - name: Configure firmware image
         run: |
           mv custom_repo/${{ env.CONFIG_FILE }} .config
           make defconfig -j$(nproc)
       
-      - name: Include some custom configuration files,
+      - name: Include custom files
         run: |
           mkdir -p ${{ env.CUSTOM_FILES_PATH }}
-          mv custom_repo/${{ env.CUSTOM_FILES_PATH }}* ./files/
+          mv custom_repo/${{ env.CUSTOM_FILES_PATH }}* ${{ env.CUSTOM_FILES_PATH }}
       
-      - name: Download package sources
-        run: |
-          make download V=s
+      - name: Download dependencies
+        run: make download V=s -j$(nproc)
 
-      - name: Build tools
-        run: |
-          make tools/install -j$(nproc) V=s || \
-          make tools/install V=s
-
-      - name: Build toolchain
-        run: |
-          make toolchain/install -j$(nproc) V=s || \
-          make toolchain/install V=s
-
-      - name: Build target images
-        run: |
-          make -j$(nproc) V=s || \
-          make V=s
-      
-      # - name: Build the firmware image
-      #   run: make download world V=sc -j$(nproc)
+      - name: Build the firmware image
+        run: make world V=s -j$(nproc)
       
       - name: Package output
         run: tar -cvf ipq807x-images.tar bin/targets/qualcommax/ipq807x
